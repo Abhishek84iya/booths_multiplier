@@ -1,0 +1,118 @@
+`timescale 1ns / 1ps
+module inversecal(
+    input [4:0] multiplicand,
+    output reg [4:0] tempinversemultiplicand
+);
+    always @(*) begin
+        tempinversemultiplicand<=(~multiplicand)+1;
+    end
+endmodule
+
+// Booth's Multiplier Module
+module booths_multiplier(
+    input clk,
+    input rst,
+    input [4:0] multiplicand,
+    input [4:0] multiplier,
+    output reg signed [10:0] temp,
+    output reg signed [10:0] tempmultiplicand,    // Extended multiplicand
+    output reg signed [10:0] tempinversemultiplicand,
+    output reg signed [9:0] accum,
+    output reg [1:0] cntrlbit
+);                // Temporary register for computation
+   // reg [10:0] tempmultiplicand;    // Extended multiplicand
+   // reg [10:0] tempinversemultiplicand; // Extended inverse multiplicand
+    //reg [1:0] cntrlbit;                    // Control bits for Booth's algorithm
+    integer count;                         // Counter for iterations
+
+    // Instantiate the inverse calculation module
+    wire [4:0] temp1inversemultiplicand;
+    inversecal isc(
+        .multiplicand(multiplicand),
+        .tempinversemultiplicand(temp1inversemultiplicand)
+    );
+    always @(negedge clk)begin
+            cntrlbit <= temp[1:0];
+    end
+    always @(posedge clk ) begin
+         
+        if (rst) begin
+            // Reset the computation
+            tempinversemultiplicand[10:6]<=temp1inversemultiplicand;
+            tempinversemultiplicand[5:0]<=0;
+            temp[0] <= 0;
+            temp[5:1]<=multiplier;
+            temp[10:6]<=0;
+            accum <= 0;
+            tempmultiplicand[10:6] <= multiplicand;
+            tempmultiplicand[5:0] <=0;
+            count <= 5;   
+             cntrlbit <= {multiplier[0], 1'b0};                  
+        end 
+        else if (count > 0) begin
+            case (cntrlbit)
+                2'b01: begin temp <= (temp + tempmultiplicand)>>>1;
+                end        
+                2'b10: begin temp <= (temp + tempinversemultiplicand)>>>1;
+                end  
+                2'b00: begin temp <= temp + tempmultiplicand; 
+                    temp<=temp>>>1;
+                end        
+                2'b11: begin temp <= temp + tempinversemultiplicand;
+                    temp<=temp>>>1; 
+                end                          
+            endcase
+            count <= count - 1;       
+        end else begin
+            accum <= temp[10:1];
+        end
+         
+    end
+endmodule
+
+
+ 
+
+ 
+
+// Testbench for Booth's Multiplier
+module testbench();
+    reg clk, rst;
+    reg [4:0] multiplicand, multiplier;
+    wire signed [9:0] accum;
+     wire signed [10:0] temp;
+     wire signed [10:0] tempmultiplicand;    // Extended multiplicand
+    wire signed [10:0] tempinversemultiplicand;
+    wire [1:0] cntrlbit;
+
+    booths_multiplier uut (
+        .clk(clk),
+        .rst(rst),
+        .multiplicand(multiplicand),
+        .multiplier(multiplier),
+        .accum(accum),
+        .tempmultiplicand(tempmultiplicand),
+        .tempinversemultiplicand(tempinversemultiplicand),
+        .temp(temp),
+        .cntrlbit(cntrlbit)
+    );
+
+    // Clock generation
+    always #5 clk = ~clk;
+
+    initial begin
+        // Initialize signals
+        clk = 0; rst = 1;
+        multiplicand = 5; multiplier = -3; // Signed multiplication: 5 * -3 = -15
+
+        // Release reset after some time
+        #8 rst = 0; 
+        // Wait for computation to finish
+        #150;
+
+        // Display result
+        $display("Multiplicand: %d, Multiplier: %d, Result: %d", multiplicand, multiplier, accum);  // Expected result: -15
+        $finish;
+    end
+    
+endmodule
