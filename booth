@@ -1,15 +1,15 @@
 module booth_multiplier(
     input  logic clk,
     input  logic rst,
-    input  logic signed [15:0] M,
-    input  logic signed [15:0] Q,
-    output logic signed [31:0] product
+    input  logic signed [4:0] M,
+    input  logic signed [4:0] Q,
+    output logic signed [9:0] product
 );
-    logic signed [15:0] accum;
-    logic [15:0] M_bar;
+    logic signed [4:0] accum;
+    logic [4:0] M_bar;
     logic Q_minusone;
-    logic signed [32:0] booth_reg;
-    logic signed [15:0] Q_reg;
+    logic signed [10:0] booth_reg;
+    logic signed [4:0] Q_reg;
     int count;
 
     always_ff @(posedge clk or posedge rst) begin
@@ -23,7 +23,7 @@ module booth_multiplier(
             Q_minusone  <= 0;
             booth_reg   <= 0;
             Q_reg       <= Q;
-            count       <= 16;
+            count       <= 5;
         end
         else if (count > 0) begin
             case ({Q_reg[0], Q_minusone})
@@ -33,8 +33,8 @@ module booth_multiplier(
             endcase
             booth_reg   = {accum, Q_reg, Q_minusone};
             booth_reg   = $signed(booth_reg) >>> 1;
-            accum       = booth_reg[32:17];
-            Q_reg       = booth_reg[16:1];
+            accum       = booth_reg[10:6];
+            Q_reg       = booth_reg[5:1];
             Q_minusone  = booth_reg[0];
             count       = count - 1;
         end
@@ -49,9 +49,9 @@ module tb_booth_multiplier;
 
     logic clk;
     logic rst;
-    logic signed [15:0] M;
-    logic signed [15:0] Q;
-    logic signed [31:0] product;
+    logic signed [4:0] M;
+    logic signed [4:0] Q;
+    logic signed [9:0] product;
      
 
     booth_multiplier dut (
